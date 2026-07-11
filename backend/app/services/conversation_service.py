@@ -3,6 +3,7 @@ from uuid import uuid4
 from app.models.conversation import Conversation
 from datetime import datetime
 from app.models.message import Message
+from app.core.system_prompt import SystemPrompt
 
 
 class ConversationService:
@@ -55,14 +56,14 @@ class ConversationService:
 
         messages = self.get_messages(conversation_id)
 
+        print(f"Message Count: {len(messages)}")
+
         if not messages:
             return ""
 
         prompt = []
 
-        prompt.append(
-            "You are My Qwen, a helpful AI assistant."
-        )
+        prompt.append(SystemPrompt.get())
 
         for message in messages:
             prompt.append(
@@ -71,4 +72,10 @@ class ConversationService:
 
         prompt.append("Assistant:")
 
-        return "\n".join(prompt)
+        final_prompt = "\n".join(prompt)
+
+        print("\n========== PROMPT ==========\n")
+        print(final_prompt)
+        print("\n============================\n")
+
+        return final_prompt
