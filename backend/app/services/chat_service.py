@@ -14,20 +14,20 @@ class ChatService:
             conversation = self.conversation_service.create_conversation()
             conversation_id = conversation.conversation_id
 
-        # Store the user's message
+        # Store user's message
         self.conversation_service.add_message(
             conversation_id=conversation_id,
             role="user",
             content=message
         )
 
-        # Build the complete prompt
-        prompt = self.conversation_service.build_prompt(conversation_id)
+        # Build messages for Ollama
+        messages = self.conversation_service.build_messages(conversation_id)
 
         # Get AI response
-        response = self.client.generate(prompt)
+        response = self.client.chat(messages)
 
-        # Store the assistant's response
+        # Store assistant response
         self.conversation_service.add_message(
             conversation_id=conversation_id,
             role="assistant",

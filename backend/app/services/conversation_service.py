@@ -52,30 +52,37 @@ class ConversationService:
             return []
         return conversation.messages
     
-    def build_prompt(self, conversation_id: str):
+    def build_messages(self, conversation_id: str):
 
         messages = self.get_messages(conversation_id)
 
         print(f"Message Count: {len(messages)}")
 
         if not messages:
-            return ""
+            return []
 
-        prompt = []
+        ollama_messages = []
 
-        prompt.append(SystemPrompt.get())
+        # System Prompt
+        ollama_messages.append({
+            "role": "system",
+            "content": SystemPrompt.get()
+        })
 
+        # Conversation History
         for message in messages:
-            prompt.append(
-                f"{message.role.capitalize()}: {message.content}"
-            )
+            ollama_messages.append({
+                "role": message.role,
+                "content": message.content
+            })
 
-        prompt.append("Assistant:")
+        print("\n========== MESSAGES ==========\n")
 
-        final_prompt = "\n".join(prompt)
+        for msg in ollama_messages:
+            print(f"{msg['role'].upper()}:")
+            print(msg["content"])
+            print()
 
-        print("\n========== PROMPT ==========\n")
-        print(final_prompt)
-        print("\n============================\n")
+        print("==============================\n")
 
-        return final_prompt
+        return ollama_messages
