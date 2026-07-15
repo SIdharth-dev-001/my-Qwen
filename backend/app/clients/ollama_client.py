@@ -26,7 +26,8 @@ class OllamaClient:
                 json={
                     "model": self.model,
                     "messages": messages,
-                    "stream": False
+                    "stream": False,
+                    "keep_alive": "30m"
                 },
                 timeout=self.timeout
             )
