@@ -1,0 +1,6 @@
+{
+  "name": "My Qwen",
+  "description": "Your premium, high-fidelity AI assistant featuring a sleek dark aesthetic, smart prompts, and conversation history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
