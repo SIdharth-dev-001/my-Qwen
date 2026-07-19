@@ -8,7 +8,7 @@ export interface MarkdownRendererProps {
   content: string;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+function MarkdownRendererComponent({ content }: MarkdownRendererProps) {
   return (
     <div className="markdown-body select-text text-zinc-100 text-sm leading-relaxed max-w-none">
       <ReactMarkdown
@@ -87,4 +87,5 @@ function CodeBlockWrapper({ language, code }: { language: string; code: string }
   );
 }
 
+export const MarkdownRenderer = React.memo(MarkdownRendererComponent);
 export default MarkdownRenderer;

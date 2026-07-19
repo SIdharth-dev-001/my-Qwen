@@ -14,7 +14,7 @@ export interface ChatMessageProps {
   onRegenerate?: () => void;
 }
 
-export function ChatMessage({ message, onRegenerate }: ChatMessageProps) {
+function ChatMessageComponent({ message, onRegenerate }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
 
@@ -91,4 +91,5 @@ export function ChatMessage({ message, onRegenerate }: ChatMessageProps) {
   );
 }
 
+export const ChatMessage = React.memo(ChatMessageComponent);
 export default ChatMessage;

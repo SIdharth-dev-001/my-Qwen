@@ -23,7 +23,7 @@ export function ChatWindow() {
 
   // Scroll to bottom on updates
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages.length, isStreaming]);
 
   const handleSelectSuggested = (promptText: string) => {

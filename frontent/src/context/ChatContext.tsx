@@ -84,35 +84,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [selectedModel]);
 
   // Create new chat session
-  const createNewChat = useCallback(async (initialPrompt?: string): Promise<string> => {
-    setIsLoading(true);
-    try {
-      const title = initialPrompt 
-        ? (initialPrompt.length > 25 ? initialPrompt.slice(0, 25) + '...' : initialPrompt) 
-        : 'New Chat';
-      const newConv = await chatService.createConversation(title, selectedModel);
-      
-      const updatedConversations = [newConv, ...conversations];
-      setConversations(updatedConversations);
-      setLocalStorage(STORAGE_KEYS.CONVERSATIONS, updatedConversations);
-      setCurrentConversationId(newConv.id);
+  const createNewChat = useCallback(async (): Promise<string> => {
+    console.log("🔥 createNewChat() called");
 
-      if (initialPrompt) {
-        // We will send the initial message. Wait to update state before triggering
-        setTimeout(() => {
-          sendMessageWithId(initialPrompt, newConv.id);
-        }, 50);
-      }
+    // Clear the currently selected conversation.
+    // The next message will be sent with conversation_id = null,
+    // allowing the backend to create the conversation.
+    setCurrentConversationId(null);
 
-      return newConv.id;
-    } catch (err) {
-      toast.error('Error creating new conversation.');
-      console.error(err);
-      return '';
-    } finally {
-      setIsLoading(false);
-    }
-  }, [conversations, selectedModel]);
+    return "";
+  }, []);
 
   // Switch conversation
   const selectConversation = useCallback((id: string) => {
@@ -124,12 +105,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await historyService.deleteConversation(id, conversations);
       setConversations(updated);
-      toast.success('Conversation deleted.');
+      toast.success("Conversation deleted.");
+
       if (currentConversationId === id) {
         setCurrentConversationId(updated.length > 0 ? updated[0].id : null);
       }
     } catch (err) {
-      toast.error('Failed to delete conversation.');
+      toast.error("Failed to delete conversation.");
       console.error(err);
     }
   }, [conversations, currentConversationId]);
@@ -139,9 +121,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await historyService.renameConversation(id, title, conversations);
       setConversations(updated);
-      toast.success('Conversation renamed.');
+      toast.success("Conversation renamed.");
     } catch (err) {
-      toast.error('Failed to rename conversation.');
+      toast.error("Failed to rename conversation.");
       console.error(err);
     }
   }, [conversations]);
@@ -158,142 +140,256 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Send message on active chat
   const sendMessage = async (content: string) => {
+    console.log("currentConversationId:", currentConversationId);
+
+    // If no conversation is selected, start a new backend conversation.
     if (!currentConversationId) {
-      await createNewChat(content);
+      console.log("🆕 Starting backend conversation...");
+      await sendMessageWithId(content, null);
       return;
     }
+
+    // Existing conversation
     await sendMessageWithId(content, currentConversationId);
   };
 
-  // Internal implementation that can target a specific ID
-  const sendMessageWithId = async (content: string, targetId: string) => {
-    if (!content.trim() || isStreaming) return;
+  const sendMessageWithId = async (
+  content: string,
+  targetId: string | null
+) => {
+  if (!content.trim() || isStreaming) return;
 
-    const userMessage: Message = {
-      id: `msg-${generateId()}`,
-      role: 'user',
-      content: content.trim(),
-      timestamp: new Date().toISOString()
-    };
+  setIsStreaming(true);
 
-    // Update state with user message
-    let activeConv: Conversation | undefined;
-    
-    setConversations((prev) => {
-      const updated = prev.map((c) => {
-        if (c.id === targetId) {
-          const isFirstMessage = c.messages.length === 0;
-          const newTitle = isFirstMessage 
-            ? (content.length > 25 ? content.slice(0, 25) + '...' : content)
-            : c.title;
+  const userMessage: Message = {
+    id: `msg-${generateId()}`,
+    role: "user",
+    content: content.trim(),
+    timestamp: new Date().toISOString(),
+  };
 
-          activeConv = {
-            ...c,
-            title: newTitle,
-            messages: [...c.messages, userMessage],
-            updatedAt: new Date().toISOString()
-          };
-          return activeConv;
-        }
-        return c;
-      });
-      setLocalStorage(STORAGE_KEYS.CONVERSATIONS, updated);
-      return updated;
-    });
+  const assistantPlaceholderId = `msg-${generateId()}`;
 
-    setIsStreaming(true);
+  const assistantPlaceholder: Message = {
+    id: assistantPlaceholderId,
+    role: "assistant",
+    content: "",
+    timestamp: new Date().toISOString(),
+    isStreaming: true,
+    isLoading: true,
+  };
 
-    // Add empty placeholder for assistant streaming
-    const assistantPlaceholderId = `msg-${generateId()}`;
-    const assistantPlaceholder: Message = {
-      id: assistantPlaceholderId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
-      isStreaming: true
-    };
+  try {
+    if (!targetId) {
+      const tempId = `temp-${generateId()}`;
 
-    setConversations((prev) => {
-      const updated = prev.map((c) => {
-        if (c.id === targetId) {
-          return {
-            ...c,
-            messages: [...c.messages, assistantPlaceholder]
-          };
-        }
-        return c;
-      });
-      return updated;
-    });
+      setCurrentConversationId(tempId);
 
-    try {
-      // Send and stream
-      await chatService.sendMessage(
-        content,
-        targetId,
-        selectedModel,
-        (streamedText) => {
-          // Update the streaming message content in real time
-          setConversations((prev) => {
-            return prev.map((c) => {
-              if (c.id === targetId) {
-                return {
-                  ...c,
-                  messages: c.messages.map((m) => {
-                    if (m.id === assistantPlaceholderId) {
-                      return { ...m, content: streamedText };
-                    }
-                    return m;
-                  })
+      setConversations(prev => [
+        {
+          id: tempId,
+          title:
+            content.length > 25
+              ? content.slice(0, 25) + "..."
+              : content,
+          model: selectedModel,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isFavorite: false,
+          messages: [
+            userMessage,
+            assistantPlaceholder,
+          ],
+        },
+        ...prev,
+      ]);
+    }
+    const result = await chatService.sendMessage(
+      content,
+      targetId,
+      selectedModel,
+      (streamedText, backendId) => {
+        // Existing conversation
+        if (targetId) {
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id !== targetId) return c;
+
+              const hasUserMessage = c.messages.some(
+                (m) => m.id === userMessage.id
+              );
+
+              let messages = [...c.messages];
+
+              if (!hasUserMessage) {
+                messages.push(userMessage);
+              }
+
+              const assistantIndex = messages.findIndex(
+                (m) => m.id === assistantPlaceholderId
+              );
+
+              if (assistantIndex === -1) {
+                messages.push({
+                  id: assistantPlaceholderId,
+                  role: "assistant",
+                  content: streamedText,
+                  timestamp: new Date().toISOString(),
+                  isStreaming: true,
+                });
+              } else {
+                messages[assistantIndex] = {
+                  ...messages[assistantIndex],
+                  content: streamedText,
                 };
               }
-              return c;
-            });
-          });
-        }
-      );
 
-      // Finish streaming and clean up flags
-      setConversations((prev) => {
-        const updated = prev.map((c) => {
-          if (c.id === targetId) {
-            return {
-              ...c,
-              messages: c.messages.map((m) => {
-                if (m.id === assistantPlaceholderId) {
-                  return { ...m, isStreaming: false };
+              return {
+                ...c,
+                title:
+                  c.messages.length === 0
+                    ? content.length > 25
+                      ? content.slice(0, 25) + "..."
+                      : content
+                    : c.title,
+                messages,
+                updatedAt: new Date().toISOString(),
+              };
+            })
+          );
+        }
+
+        // Brand new conversation
+        else {
+
+          if (!backendId) return;
+
+          setConversations((prev) => {
+            const existing =
+            prev.find(c => c.id === backendId) ||
+            prev.find(c => c.id.startsWith("temp-"));
+
+            if (existing) {
+              return prev.map((c) => {
+                if (
+                    c.id !== backendId &&
+                    !c.id.startsWith("temp-")
+                ) {
+                    return c;
                 }
-                return m;
-              })
-            };
-          }
-          return c;
-        });
-        setLocalStorage(STORAGE_KEYS.CONVERSATIONS, updated);
-        return updated;
+
+                const assistantIndex = c.messages.findIndex(
+                  (m) => m.id === assistantPlaceholderId
+                );
+
+                let messages = [...c.messages];
+
+                if (assistantIndex === -1) {
+                  messages.push({
+                    id: assistantPlaceholderId,
+                    role: "assistant",
+                    content: streamedText,
+                    timestamp: new Date().toISOString(),
+                    isStreaming: true,
+                  });
+                } else {
+                  messages[assistantIndex] = {
+                    ...messages[assistantIndex],
+                    content: streamedText,
+                  };
+                }
+
+                return {
+                  ...c,
+                  id: backendId,
+                  messages,
+                  updatedAt: new Date().toISOString(),
+                };
+              });
+            }
+
+            return [
+            {
+              id: backendId,
+              title:
+                content.length > 25
+                  ? content.slice(0, 25) + "..."
+                  : content,
+              model: selectedModel,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              isFavorite: false,
+              messages: [
+                userMessage,
+                {
+                  ...assistantPlaceholder,
+                  content: streamedText,
+                  isLoading: false,
+                },
+              ],
+            },
+            ...prev,
+          ];
+          });
+
+          setCurrentConversationId(backendId);
+        }
+      }
+    );
+
+    const backendId = result.conversationId ?? targetId;
+
+    if (!backendId) return;
+
+    setConversations((prev) => {
+      const updated = prev.map((c) => {
+        if (c.id !== backendId) return c;
+
+        return {
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantPlaceholderId
+              ? { ...m, isStreaming: false }
+              : m
+          ),
+        };
       });
-    } catch (err) {
-      toast.error('Failed to generate AI response.');
-      console.error(err);
-      
-      // Remove the placeholder if it failed
+
+      setLocalStorage(STORAGE_KEYS.CONVERSATIONS, updated);
+
+      return updated;
+    });
+
+    if (!targetId && result.conversationId) {
+      setCurrentConversationId(result.conversationId);
+    }
+  } catch (err) {
+    toast.error("Failed to generate AI response.");
+    console.error(err);
+
+    if (targetId) {
       setConversations((prev) => {
         const updated = prev.map((c) => {
-          if (c.id === targetId) {
-            return {
-              ...c,
-              messages: c.messages.filter((m) => m.id !== assistantPlaceholderId)
-            };
-          }
-          return c;
+          if (c.id !== targetId) return c;
+
+          return {
+            ...c,
+            messages: c.messages.filter(
+              (m) => m.id !== assistantPlaceholderId
+            ),
+          };
         });
+
         setLocalStorage(STORAGE_KEYS.CONVERSATIONS, updated);
+
         return updated;
       });
-    } finally {
-      setIsStreaming(false);
     }
-  };
+  } finally {
+    setIsStreaming(false);
+  }
+};
+
 
   const clearAllConversations = () => {
     setConversations([]);
