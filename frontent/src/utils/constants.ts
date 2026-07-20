@@ -56,4 +56,5 @@ export const STORAGE_KEYS = {
   API_URL: 'qwen_api_url'
 };
 
-export const DEFAULT_API_URL = 'http://localhost:8000';
+// export const DEFAULT_API_URL = 'http://localhost:8000';
+export const DEFAULT_API_URL = '/api';
