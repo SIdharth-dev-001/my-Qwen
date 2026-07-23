@@ -73,6 +73,7 @@ class OllamaClient:
         print("Sending streaming request to Ollama Chat API...")
 
         try:
+            post_start = time.time()
 
             response = requests.post(
                 f"{self.base_url}/api/chat",
@@ -85,13 +86,19 @@ class OllamaClient:
                 timeout=self.timeout,
                 stream=True
             )
+            print(f"HTTP Connected : {time.time() - post_start:.2f}s")
 
             response.raise_for_status()
 
-            for line in response.iter_lines():
+            first_chunk = True
 
+            for line in response.iter_lines(chunk_size=1):
                 if not line:
                     continue
+
+                if first_chunk:
+                    print(f"First Chunk : {time.time() - start_time:.2f}s")
+                    first_chunk = False
 
                 chunk = json.loads(line.decode("utf-8"))
 
@@ -115,6 +122,11 @@ class OllamaClient:
                     load_duration = chunk.get("load_duration")
                     prompt_eval_duration = chunk.get("prompt_eval_duration")
                     eval_duration = chunk.get("eval_duration")
+
+                    # Calculate tokens per second
+                    if eval_duration and chunk.get("eval_count"):
+                        tokens_per_second = chunk["eval_count"] / (eval_duration / 1e9)
+                        print(f"Tokens / Second  : {tokens_per_second:.2f}")
 
                     if load_duration is not None:
                         print(f"Load Duration    : {load_duration / 1e9:.2f} sec")

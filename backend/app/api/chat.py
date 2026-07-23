@@ -33,7 +33,7 @@ def stream_chat(
         for chunk in stream:
             content = chunk.get("message", {}).get("content", "")
             if content:
-                yield content
+                yield content.encode("utf-8")
 
     return StreamingResponse(
         generate(),
