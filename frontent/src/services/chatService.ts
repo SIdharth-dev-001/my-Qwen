@@ -55,18 +55,8 @@ export const chatService = {
   const decoder = new TextDecoder();
 
   let fullResponse = "";
-  let latestResponse = "";
-  let animationFrame: number | null = null;
 
-  const flush = () => {
-    animationFrame = null;
-
-    if (onChunk) {
-      onChunk(latestResponse, backendConversationId);
-    }
-  };
-
-  while (true) {
+while (true) {
     const { done, value } = await reader.read();
 
     if (done) break;
@@ -74,21 +64,11 @@ export const chatService = {
     const chunk = decoder.decode(value, { stream: true });
 
     fullResponse += chunk;
-    latestResponse = fullResponse;
 
-    if (animationFrame === null) {
-      animationFrame = requestAnimationFrame(flush);
+    if (onChunk) {
+        onChunk(fullResponse, backendConversationId);
     }
-  }
-
-  // Flush any remaining text
-  if (animationFrame !== null) {
-    cancelAnimationFrame(animationFrame);
-  }
-
-  if (onChunk) {
-    onChunk(fullResponse, backendConversationId);
-  }
+}
 
   return {
     conversationId: backendConversationId,
